@@ -53,8 +53,10 @@ class BilibiliEcho_Plugin implements Typecho_Plugin_Interface
             'expireTime',
             NULL,
             24,
-            _t('缓存时间）',
-            _t('单位为小时（建议大于12小时，以减轻服务器负担。如果设置过低可能无效，因为 api 服务器本身也带有缓存。'))
+            _t(
+                '缓存时间',
+                _t('单位为小时（建议大于12小时，以减轻服务器负担。如果设置过低可能无效，因为 api 服务器本身也带有缓存。')
+            )
         );
         $form->addInput($expireTime);
 
@@ -66,12 +68,33 @@ class BilibiliEcho_Plugin implements Typecho_Plugin_Interface
         );
         $form->addInput($count);
 
+        $ignore = new Typecho_Widget_Helper_Form_Element_Text(
+            'ignore',
+            NULL,
+            '',
+            _t(
+                '忽略规则 regex',
+                _t('如果本设置项不为空，那么如果正则匹配数量大于零，则对应的动态会忽略不显示。忽略规则和选取规则只能填写一个，多选按忽略规则计。')
+            )
+        );
+        $form->addInput($ignore);
+
+        $select = new Typecho_Widget_Helper_Form_Element_Text(
+            'select',
+            NULL,
+            '',
+            _t(
+                '选取规则 regex',
+                _t('如果本设置项不为空，那么只有正则匹配数量大于零的的动态会显示。忽略规则和选取规则只能填写一个，多选按忽略规则计。')
+            )
+        );
+        $form->addInput($select);
+
         $share = new Typecho_Widget_Helper_Form_Element_Radio('share', array(
             0   =>  _t('否'),
             1   =>  _t('是')
         ), 0, _t('显示转发内容'));
         $form->addInput($share->addRule('enum', _t('请选择一种'), array(0, 1)));
-
     }
 
     /**
@@ -91,6 +114,8 @@ class BilibiliEcho_Plugin implements Typecho_Plugin_Interface
         $expireTime = Typecho_Widget::widget('Widget_Options')->plugin('BilibiliEcho')->expireTime;
         $count = intval(Typecho_Widget::widget('Widget_Options')->plugin('BilibiliEcho')->count);
         $share = intval(Typecho_Widget::widget('Widget_Options')->plugin('BilibiliEcho')->share);
+        $ignore = Typecho_Widget::widget('Widget_Options')->plugin('BilibiliEcho')->ignore;
+        $select = Typecho_Widget::widget('Widget_Options')->plugin('BilibiliEcho')->select;
 
 
 
@@ -112,23 +137,42 @@ class BilibiliEcho_Plugin implements Typecho_Plugin_Interface
         <div class="heading-title">
             Dynamics
         </div>
-        <ul class="list--withIcon list">
+        <ul class="list--withIcon">
 
             <?php foreach ($rss->item as $item) :
                 if ($counter == $count) break;
-                if (strpos($item->description, "转发自") > 0 && !$share) {
+                $content = $item->description;
+                if (strpos($content, "转发自") > 0 && !$share) {
                     continue;
                 }
-                $item->description = preg_replace("/\[.*?\]/", "", $item->description);
-                $item->description = str_replace("<img", '<img style="border-radius: 4px;"', $item->description);
+                if (isset($ignore)) {
+                    if (preg_match($ignore, $content)) {
+                        continue;
+                    }
+                } else if (isset($select)) {
+                    if (!preg_match($select, $content)) {
+                        continue;
+                    }
+                }
+                $content = preg_replace("/\[.*?\]/", "", $content);
+                $content = str_replace("\n", '<br>', $content);
+                if (strpos($content, '<br>') === 0)
+                {
+                    $content = substr($content, 4);
+                }
+                $content = str_replace("<img", '<img style="box-sizing: border-box;border-radius: 4px; border: 1px solid #DADADA; padding: 2px;margin-top: 5px;object-fit: cover;"', $content);
                 ?>
                 <li class="list-item">
+                    <span style="font-size: .9em;">
+                        <?php
+                        echo '<a style="font-size: .9em; color: #5DADE2;" href="' . $item->link . '">@' . htmlspecialchars($author) . '</a>&nbsp;';
+                        ?>
+                        <span style="color: #aaa; font-size: .6em;"><time class="lately-a" datetime="<?php echo date("Y-m-d H:i:s", intval($item->timestamp)); ?>" itemprop="datePublished">
+                                <?php echo date("Y-m-d H:i:s", $item->timestamp); ?></time></span>
+                    </span>
                     <?php
-                    echo '' .
-                        '<p style="font-size: .9em;"><a style="color: #5DADE2;" href="' . $item->link . '">@' . htmlspecialchars($author) . '</a>&nbsp;' .
-                        $item->description . '</p>';
+                    echo '<p style="padding-top: 10px;color: rgba(0, 0, 0, .6);font-size: 14px;">' . $content . '</p>';
                     ?>
-                    <small style="color: #aaa; float: right; font-size: .6em;"><time class="lately-a" datetime="<?php echo date("Y-m-d H:i:s", intval($item->timestamp)); ?>" itemprop="datePublished"><?php echo date("Y-m-d H:i:s", $item->timestamp); ?></time></small>
                     <br />
                 </li>
                 <?php
