@@ -145,11 +145,11 @@ class BilibiliEcho_Plugin implements Typecho_Plugin_Interface
                 if (strpos($content, "转发自") > 0 && !$share) {
                     continue;
                 }
-                if (isset($ignore)) {
+                if (isset($ignore) && ($ignore!='')) {
                     if (preg_match($ignore, $content)) {
                         continue;
                     }
-                } else if (isset($select)) {
+                } else if (isset($select) && ($select!='')) {
                     if (!preg_match($select, $content)) {
                         continue;
                     }
